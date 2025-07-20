@@ -103,16 +103,21 @@ class SuccessResponse(BaseModel):
     message: str
     data: Optional[dict] = None
 
-# --- 4. Lifecycle Management ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     print("Starting up...")
     try:
+        # Test database connection first
+        with engine.connect() as conn:
+            conn.execute("SELECT 1")
+        
+        # Create tables
         Base.metadata.create_all(bind=engine)
         print("Database tables created successfully!")
     except Exception as e:
-        print(f"Error creating database tables: {e}")
+        print(f"Error during startup: {e}")
+        # Don't fail startup, but log the issue
     yield
     # Shutdown
     print("Shutting down...")
@@ -129,50 +134,79 @@ app = FastAPI(
 # Global Exception Handlers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handler untuk HTTP exceptions dengan response yang konsisten."""
+    from datetime import datetime
+    
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "detail": exc.detail,
             "status_code": exc.status_code,
-            "timestamp": "2025-07-20T00:00:00Z",
-            "path": str(request.url.path)
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "path": str(request.url.path),
+            "method": request.method
         }
     )
 
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
+    """Handler untuk validation errors dari Pydantic."""
+    from datetime import datetime
+    
     return JSONResponse(
         status_code=422,
         content={
-            "detail": "Validation error",
+            "detail": "Data validation failed",
             "status_code": 422,
-            "timestamp": "2025-07-20T00:00:00Z",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "path": str(request.url.path),
-            "errors": exc.errors()
+            "method": request.method,
+            "validation_errors": exc.errors()
         }
     )
 
 @app.exception_handler(SQLAlchemyError)
 async def database_exception_handler(request: Request, exc: SQLAlchemyError):
+    """Handler untuk database errors."""
+    from datetime import datetime
+    
+    error_detail = "Database operation failed"
+    
+    # Provide more specific error messages for common issues
+    error_str = str(exc)
+    if "relation" in error_str and "does not exist" in error_str:
+        error_detail = "Database table does not exist. Please run the seeding endpoint first."
+    elif "duplicate key" in error_str:
+        error_detail = "Duplicate data - record already exists"
+    elif "connection" in error_str.lower():
+        error_detail = "Database connection failed"
+    
     return JSONResponse(
         status_code=500,
         content={
-            "detail": "Database error occurred",
+            "detail": error_detail,
             "status_code": 500,
-            "timestamp": "2025-07-20T00:00:00Z",
-            "path": str(request.url.path)
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "path": str(request.url.path),
+            "method": request.method,
+            "error_type": "database_error"
         }
     )
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
+    """Handler untuk general exceptions."""
+    from datetime import datetime
+    
     return JSONResponse(
         status_code=500,
         content={
-            "detail": "Internal server error",
+            "detail": "Internal server error occurred",
             "status_code": 500,
-            "timestamp": "2025-07-20T00:00:00Z",
-            "path": str(request.url.path)
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "path": str(request.url.path),
+            "method": request.method,
+            "error_type": "internal_error"
         }
     )
 
@@ -199,53 +233,193 @@ def health_check(db: Session = Depends(get_db)):
         # Test database connection
         db.execute("SELECT 1")
         
-        # Get locations count
-        location_count = db.query(DBLocation).count()
+        # Try to get locations count (create table if not exists)
+        try:
+            location_count = db.query(DBLocation).count()
+        except Exception as e:
+            # Jika tabel belum ada, coba buat
+            try:
+                Base.metadata.create_all(bind=engine)
+                location_count = db.query(DBLocation).count()
+            except Exception as create_error:
+                location_count = "unknown"
+                print(f"Could not determine location count: {create_error}")
         
         return {
             "status": "healthy",
             "database": "connected",
             "locations_count": location_count,
-            "timestamp": "2025-07-20T00:00:00Z"
+            "timestamp": "2025-07-20T00:00:00Z",
+            "version": "FINAL",
+            "endpoints": {
+                "root": "/",
+                "docs": "/docs",
+                "locations": "/locations",
+                "seed": "/api/seed",
+                "health": "/health"
+            }
         }
     except Exception as e:
         raise HTTPException(
             status_code=503, 
             detail=f"Service unavailable - Database error: {str(e)}"
         )
+
+@app.get("/api/debug", tags=["Debug"])
+def debug_info():
+    """Debug endpoint untuk melihat informasi sistem."""
+    import sys
+    import platform
+    
+    try:
+        # Test database connection
+        test_db = SessionLocal()
+        test_db.execute("SELECT 1")
+        db_status = "connected"
+        test_db.close()
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
+    # Check file paths
+    current_dir = os.getcwd()
+    file_exists = {}
+    possible_paths = [
+        'db.json',
+        '../db.json', 
+        '/app/db.json',
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), 'db.json')
+    ]
+    
+    for path in possible_paths:
+        file_exists[path] = os.path.exists(path)
+    
+    return {
+        "python_version": sys.version,
+        "platform": platform.platform(),
+        "current_directory": current_dir,
+        "database_url_set": bool(settings.DATABASE_URL != "sqlite:///./test.db"),
+        "seed_secret_set": bool(settings.SEED_SECRET != "default_secret"),
+        "database_status": db_status,
+        "file_paths": file_exists,
+        "environment_variables": {
+            "DATABASE_URL": "***SET***" if settings.DATABASE_URL != "sqlite:///./test.db" else "NOT SET",
+            "SEED_SECRET": "***SET***" if settings.SEED_SECRET != "default_secret" else "NOT SET"
+        }
+    }
 # --- 7. Endpoint Seeding Rahasia (Jalankan Sekali) ---
 @app.post("/api/seed", response_model=SuccessResponse, tags=["Admin (Jalankan Sekali Saja)"])
 def seed_database(secret: str = Query(..., description="Kunci rahasia untuk seeding."), db: Session = Depends(get_db)):
     """Mengisi database dengan data awal dari db.json. Membutuhkan kunci rahasia."""
     try:
+        # Validasi secret
         if secret != settings.SEED_SECRET:
             raise HTTPException(status_code=403, detail="Kunci rahasia tidak valid.")
 
-        if db.query(DBLocation).count() > 0:
-            raise HTTPException(status_code=400, detail="Database sudah terisi.")
-
-        # File db.json harus ada di folder root proyek
+        # Pastikan tabel ada terlebih dahulu
         try:
-            with open('db.json', 'r', encoding='utf-8') as f:
-                locations_data = json.load(f)["locations"]
-        except FileNotFoundError:
-            raise HTTPException(status_code=500, detail="File db.json tidak ditemukan di root proyek.")
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=500, detail="File db.json tidak valid (JSON error).")
+            Base.metadata.create_all(bind=engine)
+        except Exception as e:
+            print(f"Warning: Error creating tables: {e}")
 
-        for loc_data in locations_data:
-            if 'Layout' in loc_data:
-                loc_data['layout_info'] = loc_data.pop('Layout')
+        # Cek apakah database sudah terisi
+        try:
+            existing_count = db.query(DBLocation).count()
+            if existing_count > 0:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Database sudah terisi dengan {existing_count} data. Gunakan endpoint DELETE jika ingin mengosongkan terlebih dahulu."
+                )
+        except Exception as e:
+            # Jika query gagal, mungkin tabel belum ada, coba buat ulang
+            print(f"Database query failed, attempting to recreate tables: {e}")
             try:
-                db.add(DBLocation(**loc_data))
-            except Exception as e:
-                db.rollback()
-                raise HTTPException(status_code=500, detail=f"Error adding location data: {str(e)}")
+                Base.metadata.drop_all(bind=engine)
+                Base.metadata.create_all(bind=engine)
+            except Exception as create_error:
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Failed to create database tables: {str(create_error)}"
+                )
+
+        # Baca file db.json - coba beberapa lokasi
+        locations_data = None
+        possible_paths = [
+            'db.json',
+            '../db.json', 
+            '/app/db.json',
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), 'db.json')
+        ]
         
+        for path in possible_paths:
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    locations_data = data.get("locations", [])
+                    print(f"Successfully loaded db.json from: {path}")
+                    break
+            except FileNotFoundError:
+                continue
+            except json.JSONDecodeError as je:
+                raise HTTPException(status_code=500, detail=f"File db.json tidak valid (JSON error): {str(je)}")
+        
+        if not locations_data:
+            raise HTTPException(status_code=500, detail="File db.json tidak ditemukan di semua lokasi yang dicoba.")
+
+        # Proses data dan masukkan ke database
+        successful_inserts = 0
+        for i, loc_data in enumerate(locations_data):
+            try:
+                # Perbaiki mapping field dari db.json ke model database
+                processed_data = {}
+                
+                # Mapping field yang benar
+                field_mapping = {
+                    'id': 'id',
+                    'name': 'name', 
+                    'locations': 'loca',  # Mapping field 'locations' ke 'loca'
+                    'loca': 'loca',       # Jika sudah ada field 'loca'
+                    'img': 'img',
+                    'desc': 'desc',
+                    'facilities': 'facilities',
+                    'Layout': 'layout',
+                    'layout_info': 'layout'
+                }
+                
+                for json_field, db_field in field_mapping.items():
+                    if json_field in loc_data:
+                        # Jangan tambahkan id jika auto-increment
+                        if json_field == 'id':
+                            continue
+                        processed_data[db_field] = loc_data[json_field]
+                
+                # Validasi data yang diperlukan
+                required_fields = ['name', 'loca', 'img', 'desc']
+                for field in required_fields:
+                    if field not in processed_data or not processed_data[field]:
+                        raise ValueError(f"Missing required field: {field}")
+                
+                # Buat instance DBLocation
+                new_location = DBLocation(**processed_data)
+                db.add(new_location)
+                successful_inserts += 1
+                
+            except Exception as e:
+                print(f"Error processing location {i+1}: {str(e)}")
+                continue
+        
+        if successful_inserts == 0:
+            db.rollback()
+            raise HTTPException(
+                status_code=500, 
+                detail="Tidak ada data yang berhasil diproses. Periksa format data di db.json."
+            )
+        
+        # Commit semua perubahan
         db.commit()
+        
         return SuccessResponse(
-            message=f"SUKSES! {len(locations_data)} data berhasil dimasukkan.",
-            data={"count": len(locations_data)}
+            message=f"SUKSES! {successful_inserts} dari {len(locations_data)} data berhasil dimasukkan.",
+            data={"inserted_count": successful_inserts, "total_data": len(locations_data)}
         )
     
     except HTTPException:
@@ -253,6 +427,29 @@ def seed_database(secret: str = Query(..., description="Kunci rahasia untuk seed
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Unexpected error during seeding: {str(e)}")
+
+@app.delete("/api/reset", response_model=SuccessResponse, tags=["Admin (Berbahaya)"])
+def reset_database(secret: str = Query(..., description="Kunci rahasia untuk reset database."), db: Session = Depends(get_db)):
+    """BERBAHAYA: Mengosongkan seluruh database. Membutuhkan kunci rahasia."""
+    try:
+        if secret != settings.SEED_SECRET:
+            raise HTTPException(status_code=403, detail="Kunci rahasia tidak valid.")
+        
+        # Hapus semua data
+        deleted_count = db.query(DBLocation).count()
+        db.query(DBLocation).delete()
+        db.commit()
+        
+        return SuccessResponse(
+            message=f"Database berhasil dikosongkan. {deleted_count} record dihapus.",
+            data={"deleted_count": deleted_count}
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error during database reset: {str(e)}")
 
 # --- 8. Endpoint CRUD & Filter ---
 
@@ -267,7 +464,19 @@ def read_locations(
 ):
     """READ (Lengkap): Mengambil daftar lokasi dengan filter dan urutan."""
     try:
-        query = db.query(DBLocation)
+        # Coba buat tabel jika belum ada
+        try:
+            query = db.query(DBLocation)
+        except Exception as table_error:
+            # Jika tabel belum ada, coba buat
+            try:
+                Base.metadata.create_all(bind=engine)
+                query = db.query(DBLocation)
+            except Exception as create_error:
+                raise HTTPException(
+                    status_code=503, 
+                    detail="Database tidak siap. Jalankan endpoint /api/seed terlebih dahulu untuk membuat tabel."
+                )
         
         if loca:
             query = query.filter(DBLocation.loca.ilike(f"%{loca}%"))
@@ -283,6 +492,8 @@ def read_locations(
         results = query.limit(limit).all()
         return results
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving locations: {str(e)}")
 
