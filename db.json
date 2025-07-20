@@ -3,7 +3,7 @@
       {
         "id": 1,
         "name": "Grace Field House",
-        "loca": "The Demon World",
+        "locations": "The Demon World",
         "img": "https://i.pinimg.com/564x/50/01/4d/50014dc9ea276b5daefcb7b6005bdafb.jpg",
         "desc": "The Grace Field House (GFグレイス=フィールドハウス, Gureisu Fīrudo Hausu?) is a symmetrical flat-hexagonal complex used to raise orphans as livestock for the demons. It is unique, being one of the four known Premium Farms. It is operated by a female human known as Grandma as well as her underlings known as Sisters and Mamas, who also double as caretakers for the children that will later be butchered for the demons to consume.\nIt consisted of five plantations, a Headquarters, and a central area that connects the plantations and Headquarters together. It is formed in a hexagonal shape. On average, there are approximately twenty-seven to twenty-nine children between the ages of one and twelve and one to two adults living on each plantation at any given time. After the fire and destruction of plantation three, Grace Field House only consists of active four plantations. \nGrace Field is hidden deep within a forest and far away from demon societies, in order to prevent demon civilians from finding it and trying to steal the orphans. The entire complex is surrounded by tall concrete walls. Beyond the walls lies a deep cliff. Both act as security measures to prevent the children inside from escaping. The only known practical ways to leave the complex are by using the bridge that connects the Headquarters to the outside world or by using the portal to the Human World located deep within the bowels of headquarters which is used for bringing food, toys, clothes, and others supplies to the farm.",
         "facilities": "The Grace Field House is a European-styled home, standing three stories tall with blue roofs and light orange walls. Asides from basic electricity, plumbing, the radio the mother uses to contact headquarters, and the high tech devices the children take their tests on, Grace Field House is void of modern technology. There are no TVs, computers, or electronic toys, and what little technology they do have is said to be older models. Laundry is done outside in a tub with a washboard and then hung on a clothesline near the house to dry.",
@@ -12,7 +12,7 @@
     {
         "id": 2,
         "name": "Shelter B06-32",
-        "loca": "The Demon World",
+        "locations": "The Demon World",
         "img": "https://i.pinimg.com/564x/22/46/16/224616c012ab448ed00363074237fb18.jpg",
         "desc": "Shelter B06-32 is an underground shelter in the demon world built by William Minerva. The shelter is comprised of a Security Room, Kitchen, Pantry, Library, Garden, Dining Area, Bathroom, and Secret room. The shelter pulls water from an underground well, generates power from a combination of geothermal energy and organic waste, and has a separate generator powered by fuel if resources were to deplete. The composition of this shelter allows the children to be self-sustainable for a couple of years before they must leave.\nThe shelter was destroyed when a group of unknown soldiers ambushed it, forcing the children to leave.",
         "facilities": "The Shelter B06-32 secret room is a hidden room located in Shelter B06-32. It houses the telephone that plays a recording from William Minerva.",
@@ -21,7 +21,7 @@
     {
         "id": 3,
         "name": "Lambda 7214",
-        "loca": "The Demon World",
+        "locations": "The Demon World",
         "img": "https://i.pinimg.com/564x/3f/53/c0/3f53c0e5ebb112ba9a055bf81af34a4d.jpg",
         "desc": "Lambda 7214 is an special research facility for experimenting on human children from various different farms. The demons and human scientists working at the facility execute repeated painful and horrific experiments on the children living there. The facility was created in order to try to create higher quality human livestock in a faster and more efficient way than the Premium Farms. However, as a result of the forced drugging and experiments done at Lambda, many children there started to experience abnormal development, side effects, and irregular growth in their muscles, senses, and nervous system. The facility was destroyed after Norman led some other kids being held there in an uprising and escaped the place. It is the farm that Norman was sent to after being shipped from Grace Field.",
         "facilities": "Lambda 7214 is a very large facility filled with many different rooms and locations for all sorts of different purposes.\nMost children are kept in small rooms, tanks, or even cages. There are some rooms that are colorful and filled with toys and stuffed animals for children to play with, while in other rooms children are eaten alive by demons.",
@@ -30,7 +30,7 @@
     {
         "id": 4,
         "name": "Demon World",
-        "loca": "The Demon World",
+        "locations": "The Demon World",
         "img": "https://i.imgur.com/5CalTT3.png",
         "desc": "The Demon World is the main setting of The Promised Neverland. The Demon World is part of the world that many years ago, was split into two between humans and demons after The Promise was signed. The part of the world belonging to the demons is comprised of many bizarre ecosystems and creatures, some of which include feral/bestial demons.\nThis is where all of the Premium Farms and Factory Farms are located.",
         "facilities": "-",
@@ -39,7 +39,7 @@
     {
         "id": 5,
         "name": "Human World",
-        "loca": "Human World",
+        "locations": "Human World",
         "img": "https://i.pinimg.com/564x/19/cd/f4/19cdf47a6aff04b9fa67e359d891b6b6.jpg",
         "desc": "The Demon World is the main setting of The Promised Neverland. The Demon World is part of the world that many years ago, was split into two between humans and demons after The Promise was signed. The part of the world belonging to the demons is comprised of many bizarre ecosystems and creatures, some of which include feral/bestial demons.\nThis is where all of the Premium Farms and Factory Farms are located.",
         "facilities": "-",
